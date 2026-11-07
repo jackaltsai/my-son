@@ -1,76 +1,47 @@
-# Nuxt Minimal Starter
+# 九宮格寫作提問練習
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+依據山口拓朗《文章寫得又快又好，九宮格寫作術》做的練習工具。流程是：先問 → 再答 → 分類 → 寫成文章。
 
-## Setup
+整個 app 只有一個 `index.html`（HTML + CSS + JS 都在裡面），不需要建置。
 
-Make sure to install dependencies:
+## 怎麼開
 
-```bash
-# npm
-npm install
+**方法一：直接打開**
 
-# pnpm
-pnpm install
+用瀏覽器打開 `index.html`（雙擊，或拖進瀏覽器）。
 
-# yarn
-yarn install
-
-# bun
-bun install
-```
-
-## Development Server
-
-Start the development server on `http://localhost:3000`:
+**方法二：本機伺服器**
 
 ```bash
-# npm
 npm run dev
-
-# pnpm
-pnpm dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
 ```
 
-## Production
+然後打開 http://localhost:3000 。第一次執行會自動下載 [`serve`](https://www.npmjs.com/package/serve)，不需要先 `npm install`。
 
-Build the application for production:
+## 功能
 
-```bash
-# npm
-npm run build
+1. **九宮格提問**：中心格寫主題，周圍 8 格用 7W3H（Who、What、When、Where、Why、Which、Whom、How、How many、How much）隨機出題。
+   - 「基礎問題」的答案是事實，「鏟子問題」的答案因人而異。
+   - 🎲 全部重新出題（答案會清空），或用每格的 ↻ 只換那一題（答案保留）。
+2. **主題清單**：6 類、36 個主題，可以從下拉選單挑，或隨機抽。
+3. **問答整理**：自動整理成純文字，可以複製。
+4. **分類・排序・文章骨架**：
+   - 把每個回答標成「事實」或「感受／意見」。
+   - 勾選要用的素材，用拖曳或 ▲▼ 排順序。
+   - 自動產生「開頭／本文／結論」大綱，可以複製。
+5. **輸出 PDF**：A4 版面，包含九宮格和「文章構想筆記」區。
 
-# pnpm
-pnpm build
+進度存在瀏覽器的 `localStorage`（key：`ninegrid-writing`），換瀏覽器或清除網站資料就會不見。
 
-# yarn
-yarn build
+## 外部依賴
 
-# bun
-bun run build
-```
+- Google Fonts：Noto Sans TC、Noto Serif TC
+- [html2canvas](https://html2canvas.hertzen.com/) 1.4.1、[jsPDF](https://github.com/parallax/jsPDF) 2.5.1（從 cdnjs 載入）
 
-Locally preview production build:
+所以要連網才能載入字型和 PDF 功能。
 
-```bash
-# npm
-npm run preview
+## 已知問題
 
-# pnpm
-pnpm preview
-
-# yarn
-yarn preview
-
-# bun
-bun run preview
-```
-
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
-# my-son
+- PDF 是圖片型，裡面的文字不能選取或搜尋。
+- PDF 的中文字型和分頁還沒完整實測。
+- 題庫和主題清單寫死在 `index.html` 裡。
