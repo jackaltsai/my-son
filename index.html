@@ -67,6 +67,27 @@
   #sheet .c.mid{background:#2f3e46;color:#f6f3ee;display:flex;align-items:center;justify-content:center;text-align:center;font-family:"Noto Serif TC",serif;font-size:20px;font-weight:700}
   #sheet h2{font-size:15px;margin:24px 0 8px}
   #sheet .notes{border:1px solid #bfb6aa;border-radius:6px;height:260px;background:repeating-linear-gradient(#fff 0 31px,#e3dcd2 31px 32px)}
+  section.org{margin-top:28px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  section.org h2{font-size:16px;margin:0 0 4px}
+  section.org .sub{font-size:13px;color:var(--muted);margin:0 0 12px}
+  .item{display:flex;align-items:flex-start;gap:10px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:#fff;transition:.15s}
+  .item.off{opacity:.45}
+  .item.dragover{border-color:var(--accent);background:var(--accent-soft)}
+  .item .handle{cursor:grab;color:var(--muted);user-select:none;padding-top:2px}
+  .item .body{flex:1;min-width:0}
+  .item .iq{font-size:12px;color:var(--muted)}
+  .item .ia{font-size:14px;white-space:pre-wrap;word-break:break-word}
+  .item .ctl{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+  .item .ctl button{padding:2px 8px;font-size:13px}
+  .type{font-size:12px;font-weight:700}
+  .type.fact{background:#e2ecf3;color:#2f5d7a;border-color:#c5d8e5}
+  .type.opin{background:var(--accent-soft);color:var(--accent);border-color:#ecc7b8}
+  .empty-note{font-size:13px;color:var(--muted)}
+  #outline{margin-top:14px}
+  .ol h3{font-size:14px;margin:12px 0 4px;color:var(--accent)}
+  .ol ul{margin:0;padding-left:20px;font-size:14px}
+  .ol li{margin-bottom:4px}
+  .ol .hint{color:var(--muted);font-size:13px}
   @media (max-width:720px){
     .grid{grid-template-columns:1fr}
     .cell.center{order:-1;min-height:auto}
@@ -94,6 +115,14 @@
   <section class="out">
     <h2>問答整理 <button id="copyBtn">複製</button></h2>
     <pre id="output">（填入主題與答案後，這裡會自動整理成文字）</pre>
+  </section>
+
+  <section class="org">
+    <h2>③④ 分類・排序・文章骨架</h2>
+    <p class="sub">把回答標成「事實」或「感受／意見」，勾選要用的素材，拖曳（或按 ▲▼）排好順序，下方就會產生文章大綱。</p>
+    <div id="items"></div>
+    <h2 style="margin-top:16px;display:flex;justify-content:space-between;align-items:center">文章大綱 <button id="copyOutline">複製大綱</button></h2>
+    <div id="outline" class="ol"></div>
   </section>
 
   <p class="tips">小提示：「基礎問題」的答案是事實；「鏟子問題」的答案因人而異，最能挖出你自己的觀點。回答不出來的格子，按 ↻ 換一題就好。</p>
@@ -180,7 +209,8 @@ const TOPICS = {
 const CATS = Object.keys(BANK);
 const POS = [0,1,2,3,5,6,7,8]; // grid positions around center (4)
 
-let state = { topic:"", cells: [] }; // cells: {cat, idx, ans}
+let state = { topic:"", cells: [], order: [0,1,2,3,4,5,6,7] }; // cells: {cat, idx, ans, type, use}
+const defType = c => BANK[c.cat][c.idx][1]==="基礎" ? "事實" : "意見";
 
 const rand = n => Math.floor(Math.random()*n);
 function pickCats(){
@@ -193,11 +223,12 @@ function pickCats(){
 function newCell(cat, prevIdx){
   const list=BANK[cat]; let idx=rand(list.length);
   if(list.length>1 && idx===prevIdx) idx=(idx+1)%list.length;
-  return {cat, idx, ans:""};
+  const n={cat, idx, ans:""}; n.type=defType(n); n.use=true; return n;
 }
 function shuffleAll(keepAns){
   const cats=pickCats();
   state.cells = cats.map((c,i)=>{ const n=newCell(c); if(keepAns && state.cells[i]) n.ans=state.cells[i].ans; return n; });
+  state.order=[0,1,2,3,4,5,6,7];
 }
 function rerollOne(i){
   const used=new Set(state.cells.map(c=>c.cat));
@@ -208,7 +239,7 @@ function rerollOne(i){
     if(free.length && Math.random()<0.5) cat=free[rand(free.length)];
   } else if(Math.random()<0.5){ cat=CATS[rand(CATS.length)]; }
   const n=newCell(cat, cat===state.cells[i].cat?state.cells[i].idx:-1);
-  n.ans=state.cells[i].ans;
+  n.ans=state.cells[i].ans; n.use=state.cells[i].use!==false;
   state.cells[i]=n;
 }
 const topicText = () => state.topic.trim() || "這個主題";
@@ -217,7 +248,10 @@ const qText = c => BANK[c.cat][c.idx][0].replaceAll("{t}", topicText());
 function save(){ try{ localStorage.setItem('ninegrid-writing', JSON.stringify(state)); }catch(e){} }
 function load(){
   try{ const s=JSON.parse(localStorage.getItem('ninegrid-writing')||'null');
-    if(s && Array.isArray(s.cells) && s.cells.length===8 && s.cells.every(c=>BANK[c.cat] && BANK[c.cat][c.idx])){ state=s; return true; }
+    if(s && Array.isArray(s.cells) && s.cells.length===8 && s.cells.every(c=>BANK[c.cat] && BANK[c.cat][c.idx])){
+      s.cells.forEach(c=>{ if(c.type!=="事實"&&c.type!=="意見") c.type=defType(c); if(typeof c.use!=="boolean") c.use=true; });
+      const o=s.order; if(!Array.isArray(o)||o.length!==8||[...o].sort().join()!=="0,1,2,3,4,5,6,7") s.order=[0,1,2,3,4,5,6,7];
+      state=s; return true; }
   }catch(e){}
   return false;
 }
@@ -284,7 +318,7 @@ function updateProgress(){
   document.getElementById('pdfBtn').classList.toggle('ready', done===8 && !!state.topic.trim());
 }
 function updateOutput(){
-  updateProgress();
+  updateProgress(); renderOrganizer();
   const any=state.topic.trim()||state.cells.some(c=>c.ans.trim());
   document.getElementById('output').textContent= any?buildText():"（填入主題與答案後，這裡會自動整理成文字）";
 }
@@ -304,6 +338,85 @@ document.getElementById('copyBtn').addEventListener('click',async()=>{
     const r=document.createRange(); r.selectNodeContents(document.getElementById('output'));
     const s=getSelection(); s.removeAllRanges(); s.addRange(r); toast("已選取文字，請按 Ctrl/⌘+C 複製");
   }
+});
+
+// ---------- 分類・排序・文章骨架 ----------
+const itemsEl=document.getElementById('items');
+function moveOrder(from,to){
+  if(to<0||to>7||from===to) return;
+  const [x]=state.order.splice(from,1); state.order.splice(to,0,x);
+  save(); renderOrganizer();
+}
+function renderOrganizer(){
+  // 輸入文字時不重建清單（避免失焦），只在結構變動時重建；這裡簡單起見每次重建但保留捲動
+  itemsEl.innerHTML="";
+  const withAns=state.order.filter(i=>state.cells[i].ans.trim());
+  if(!withAns.length){
+    itemsEl.innerHTML='<p class="empty-note">先在上面的九宮格寫下回答，有內容的格子會出現在這裡。</p>';
+  }
+  state.order.forEach((ci,pos)=>{
+    const c=state.cells[ci]; if(!c.ans.trim()) return;
+    const el=document.createElement('div');
+    el.className="item"+(c.use?"":" off"); el.draggable=true; el.dataset.pos=pos;
+    el.innerHTML=`<span class="handle" title="拖曳排序">⠿</span>
+      <input type="checkbox" ${c.use?"checked":""} title="使用這項素材">
+      <div class="body"><div class="iq"></div><div class="ia"></div></div>
+      <div class="ctl"><button class="type ${c.type==="事實"?"fact":"opin"}" title="切換：事實／感受・意見">${c.type==="事實"?"事實":"感受／意見"}</button>
+      <button class="up" title="上移">▲</button><button class="dn" title="下移">▼</button></div>`;
+    el.querySelector('.iq').textContent=`【${c.cat}】${qText(c)}`;
+    el.querySelector('.ia').textContent=c.ans.trim();
+    el.querySelector('input').addEventListener('change',e=>{ c.use=e.target.checked; save(); renderOrganizer(); });
+    el.querySelector('.type').addEventListener('click',()=>{ c.type=c.type==="事實"?"意見":"事實"; save(); renderOrganizer(); });
+    el.querySelector('.up').addEventListener('click',()=>moveOrder(pos,prevPos(pos,-1)));
+    el.querySelector('.dn').addEventListener('click',()=>moveOrder(pos,prevPos(pos,1)));
+    el.addEventListener('dragstart',e=>{ e.dataTransfer.setData('text/plain',String(pos)); e.dataTransfer.effectAllowed='move'; });
+    el.addEventListener('dragover',e=>{ e.preventDefault(); el.classList.add('dragover'); });
+    el.addEventListener('dragleave',()=>el.classList.remove('dragover'));
+    el.addEventListener('drop',e=>{ e.preventDefault(); el.classList.remove('dragover');
+      const from=+e.dataTransfer.getData('text/plain'); if(!isNaN(from)) moveOrder(from,pos); });
+    itemsEl.appendChild(el);
+  });
+  document.getElementById('outline').innerHTML=outlineHtml();
+}
+// 上移／下移時跳過沒有回答的格子
+function prevPos(pos,dir){
+  let t=pos+dir; while(t>=0&&t<8&&!state.cells[state.order[t]].ans.trim()) t+=dir;
+  return t;
+}
+function outlineParts(){
+  const sel=state.order.map(i=>state.cells[i]).filter(c=>c.use&&c.ans.trim());
+  const n=sel.length;
+  if(n===0) return null;
+  if(n<3) return {head:[],body:sel,tail:[]};
+  return {head:[sel[0]],body:sel.slice(1,-1),tail:[sel[n-1]]};
+}
+const brief = a => { const t=a.trim().replace(/\s+/g," "); return t.length>60?t.slice(0,60)+"…":t; };
+function outlineData(){
+  const p=outlineParts(); if(!p) return null;
+  const mk=c=>({type:c.type==="事實"?"事實":"感受／意見", q:qText(c), a:brief(c.ans)});
+  return {topic:topicText(), head:p.head.map(mk), body:p.body.map(mk), tail:p.tail.map(mk)};
+}
+function outlineHtml(){
+  const d=outlineData();
+  if(!d) return '<p class="empty-note">勾選至少一項素材後，這裡會產生「開頭／本文／結論」大綱。</p>';
+  const li=x=>`<li><b>[${x.type}]</b> ${esc(x.a)}<br><span class="hint">${esc(x.q)}</span></li>`;
+  const sec=(t,hint,arr)=>`<h3>${t}</h3>`+(arr.length?`<ul>${arr.map(li).join("")}</ul>`:`<p class="hint">${hint}</p>`);
+  return `<p><b>主題：</b>${esc(d.topic)}</p>`
+    + sec("開頭","（素材少於 3 項，先全部放在本文。可用一句話點出主題與寫作動機。）",d.head)
+    + sec("本文","（尚無素材）",d.body)
+    + sec("結論","（可用一句話收尾：你的結論、感受或給讀者的建議。）",d.tail);
+}
+function outlineText(){
+  const d=outlineData(); if(!d) return "";
+  const f=x=>`  ・[${x.type}] ${x.a}`;
+  const sec=(t,arr)=>arr.length?`${t}\n${arr.map(f).join("\n")}`:`${t}\n  （自行補寫）`;
+  return [`主題：${d.topic}`,"",sec("【開頭】",d.head),"",sec("【本文】",d.body),"",sec("【結論】",d.tail)].join("\n");
+}
+document.getElementById('copyOutline').addEventListener('click',async()=>{
+  const t=outlineText(); if(!t){ toast("還沒有可用的素材"); return; }
+  try{ await navigator.clipboard.writeText(t); toast("大綱已複製"); }
+  catch(e){ const r=document.createRange(); r.selectNodeContents(document.getElementById('outline'));
+    const s=getSelection(); s.removeAllRanges(); s.addRange(r); toast("已選取文字，請按 Ctrl/⌘+C 複製"); }
 });
 
 // ---------- PDF export ----------
